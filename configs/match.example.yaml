@@ -1,0 +1,35 @@
+# Example pipeline config. Copy to match.yaml and edit paths for your machine.
+# All relative paths are resolved against THIS file's directory.
+
+device: auto            # auto | cuda | cpu
+show_minimap: true
+
+video:
+  input_path: ../data/match.mp4
+  output_path: ../data_output/output.mp4
+  frame_size: [1280, 720]
+  skip_frames: 1
+  save_output: true
+  show_output: true
+
+detector:
+  model_path: ../models/ball_cv_new_data.pt
+  confidence_threshold: 0.96
+  min_area: 100
+  max_area: 10000
+
+people:
+  model_path: ../models/people_detector.pt
+  confidence_threshold: 0.2
+  min_players_to_init_teams: 12
+
+tracker:
+  max_age: 15
+  n_init: 2
+  max_cosine_distance: 0.4
+  nn_budget: 10
+  history_length: 10
+
+# Either inline the field points or point to a JSON file (resolved relative
+# to this config). The JSON format matches data/field_config.json.
+field_points_path: ../data/field_config.json

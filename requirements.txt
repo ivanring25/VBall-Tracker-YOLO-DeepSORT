@@ -1,0 +1,9 @@
+# vtracker runtime dependencies
+numpy
+opencv-python
+pyyaml
+ultralytics            # YOLO (ball + people)
+deep-sort-realtime     # ball tracking
+supervision            # ByteTrack for people
+scikit-learn           # KMeans team assignment
+torch                  # device detection / YOLO backend

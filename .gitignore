@@ -1,0 +1,45 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+.venv-*/
+
+# --- Model weights (large binaries, store externally) ---
+*.pt
+*.pth
+*.onnx
+*.pkl
+models/
+
+# --- Media (large; inputs/outputs not versioned) ---
+*.mp4
+*.avi
+*.mov
+*.mkv
+video_output/
+
+# --- Generated output / logs ---
+data_output/
+log_files/
+*.log
+
+# --- Local, machine-specific config (keep the *.example.yaml only) ---
+configs/*.yaml
+!configs/*.example.yaml
+
+# --- Tooling / IDE / OS ---
+.idea/
+.vscode/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.DS_Store
+Thumbs.db
