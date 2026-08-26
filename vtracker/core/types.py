@@ -36,7 +36,7 @@ class BBox:
     h: float
 
     @classmethod
-    def from_ltrb(cls, left: float, top: float, right: float, bottom: float) -> "BBox":
+    def from_ltrb(cls, left: float, top: float, right: float, bottom: float) -> BBox:
         return cls(left, top, right - left, bottom - top)
 
     @property

@@ -19,14 +19,17 @@ from vtracker.core.logging import get_logger
 from vtracker.infrastructure.detectors.yolo_ball import YoloBallDetector
 from vtracker.infrastructure.detectors.yolo_people import YoloPeopleTracker
 from vtracker.infrastructure.display import DisplayStage
+from vtracker.infrastructure.exporters.json_exporter import JsonDetectionExporter
 from vtracker.infrastructure.exporters.video_exporter import VideoExporter
 from vtracker.infrastructure.projection.homography import HomographyProjector
 from vtracker.infrastructure.trackers.deepsort_ball import DeepSortBallTracker
 from vtracker.infrastructure.video.opencv_source import OpenCvVideoSource
-from vtracker.pipeline.runner import PipelineRunner
+from vtracker.pipeline.runner import PipelineRunner, Stage
 from vtracker.pipeline.stages import (
     DetectBallStage,
+    ExportContextStage,
     ExportStage,
+    InterpolateStage,
     TrackBallStage,
     TrackPeopleStage,
     VisualizeStage,
@@ -61,17 +64,31 @@ def build_and_run(config_path: str) -> None:
     drawers.append(HudDrawer(device))
     renderer = Renderer(drawers)
 
-    stages = [
-        DetectBallStage(detector),
+    stages: list[Stage] = [DetectBallStage(detector)]
+    # Kalman gap-bridging sits before tracking so synthetic detections keep the
+    # DeepSORT track alive across short misses.
+    if cfg.interpolation.enabled:
+        stages.append(InterpolateStage(
+            max_gap=cfg.interpolation.max_gap,
+            process_var=cfg.interpolation.process_var,
+            measurement_var=cfg.interpolation.measurement_var,
+            gravity=cfg.interpolation.gravity,
+        ))
+    stages += [
         TrackBallStage(tracker),
         TrackPeopleStage(people),
         VisualizeStage(renderer),
     ]
 
-    exporter = None
+    closeables: list[JsonDetectionExporter | VideoExporter] = []
+    if cfg.json_output_path:
+        json_exporter = JsonDetectionExporter(cfg.json_output_path)
+        stages.append(ExportContextStage(json_exporter))
+        closeables.append(json_exporter)
     if cfg.video.save_output:
         exporter = VideoExporter(cfg.video.output_path, source.fps, cfg.video.frame_size)
         stages.append(ExportStage(exporter))
+        closeables.append(exporter)
     if cfg.video.show_output:
         stages.append(DisplayStage())
 
@@ -81,9 +98,12 @@ def build_and_run(config_path: str) -> None:
     try:
         runner.run()
     finally:
-        if exporter is not None:
-            exporter.close()
-        log.info("output: %s", cfg.video.output_path)
+        for sink in closeables:
+            sink.close()
+        if cfg.video.save_output:
+            log.info("video output: %s", cfg.video.output_path)
+        if cfg.json_output_path:
+            log.info("json output: %s", cfg.json_output_path)
 
 
 def main(argv: list[str] | None = None) -> int:

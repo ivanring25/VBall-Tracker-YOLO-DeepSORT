@@ -96,7 +96,7 @@ class YoloBallDetector:
             return []
         results = self._model(rois, device=self._device, verbose=False)
         out: list[BallDetection] = []
-        for (x, y, w, h), r in zip(kept, results):
+        for (x, y, w, h), r in zip(kept, results, strict=True):
             if r.probs is None:
                 continue
             conf = r.probs.top1conf.item()

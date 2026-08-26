@@ -4,7 +4,7 @@ each registered drawer in order. Add/remove overlays by changing the list."""
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from vtracker.pipeline.context import FrameContext
 

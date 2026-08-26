@@ -115,7 +115,7 @@ class FieldMarker:
 
     def load(self) -> None:
         try:
-            with open(self.out_path, "r", encoding="utf-8") as f:
+            with open(self.out_path, encoding="utf-8") as f:
                 self.points = json.load(f)
             print(f"Loaded field points <- {self.out_path}")
         except FileNotFoundError:

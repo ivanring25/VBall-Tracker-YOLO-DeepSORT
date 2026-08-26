@@ -9,7 +9,7 @@ replacement for ``BallTrackingPipeline.run()`` (the old God Object).
 from __future__ import annotations
 
 import time
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import cv2
 

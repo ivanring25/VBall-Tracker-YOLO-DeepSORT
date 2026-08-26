@@ -63,7 +63,7 @@ class RecordingRenderer:
         self.rendered += 1
 
 
-def run() -> None:
+def test_pipeline_runs_every_stage_over_every_frame() -> None:
     source = FakeSource()
     tracker = FakeTracker()
     renderer = RecordingRenderer()
@@ -87,4 +87,4 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    test_pipeline_runs_every_stage_over_every_frame()

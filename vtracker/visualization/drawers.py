@@ -20,13 +20,13 @@ _TRACK_COLOR = (0, 255, 0)
 
 def _blit(ctx: FrameContext, patch: np.ndarray, x0: int, y0: int, alpha: float = 0.5) -> None:
     """Alpha-blend a minimap patch onto the display frame at (x0, y0)."""
-    h, w = ctx.display.shape[:2]
+    h, w = ctx.surface.shape[:2]
     mh, mw = patch.shape[:2]
     x0 = max(0, min(x0, w - mw))
     y0 = max(0, min(y0, h - mh))
-    overlay = ctx.display.copy()
+    overlay = ctx.surface.copy()
     overlay[y0:y0 + mh, x0:x0 + mw] = patch[:, :, :3]
-    cv2.addWeighted(overlay, alpha, ctx.display, 1 - alpha, 0, dst=ctx.display)
+    cv2.addWeighted(overlay, alpha, ctx.surface, 1 - alpha, 0, dst=ctx.surface)
 
 
 class BallDetectionDrawer:
@@ -39,8 +39,8 @@ class BallDetectionDrawer:
     def draw(self, ctx: FrameContext) -> None:
         for det in ctx.detections:
             x, y, w, h = (int(v) for v in (det.box.x, det.box.y, det.box.w, det.box.h))
-            cv2.rectangle(ctx.display, (x, y), (x + w, y + h), self._color, self._thickness)
-            cv2.putText(ctx.display, f"{det.confidence:.2f}", (x, y - 5),
+            cv2.rectangle(ctx.surface, (x, y), (x + w, y + h), self._color, self._thickness)
+            cv2.putText(ctx.surface, f"{det.confidence:.2f}", (x, y - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
 
 
@@ -61,9 +61,9 @@ class PeopleDrawer:
         foot = box.foot
         cx, y2 = int(foot.x), int(foot.y)
         width = int(box.w / 2)
-        cv2.ellipse(ctx.display, (cx, y2), (width, int(0.35 * width)),
+        cv2.ellipse(ctx.surface, (cx, y2), (width, int(0.35 * width)),
                     0.0, -45, 235, color, 2, cv2.LINE_4)
-        cv2.putText(ctx.display, label, (cx - width, y2 + 18),
+        cv2.putText(ctx.surface, label, (cx - width, y2 + 18),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
 
 
@@ -81,14 +81,14 @@ class BallTrackDrawer:
             for i in range(1, len(pts)):
                 alpha = i / len(pts)
                 color = tuple((self._color * alpha).astype(int).tolist())
-                cv2.line(ctx.display, tuple(map(int, pts[i - 1])),
+                cv2.line(ctx.surface, tuple(map(int, pts[i - 1])),
                          tuple(map(int, pts[i])), color, 2, cv2.LINE_AA)
             x, y = pts[-1]
             speed = ctx.ball_speeds.get(tid, 0.0)
-            cv2.putText(ctx.display, f"ID:{tid} {speed:.0f}px/s",
+            cv2.putText(ctx.surface, f"ID:{tid} {speed:.0f}px/s",
                         (int(x), int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (0, 255, 0), 1, cv2.LINE_AA)
-            cv2.arrowedLine(ctx.display, tuple(map(int, pts[-2])),
+            cv2.arrowedLine(ctx.surface, tuple(map(int, pts[-2])),
                             tuple(map(int, pts[-1])), (0, 0, 255), 2, tipLength=0.3)
 
 
@@ -131,7 +131,7 @@ class MinimapDrawer:
                                    player.track_id)
         for ref in ctx.people.referees.values():
             self._project_and_plot(mm, ref.foot, _REFEREE_COLOR, ref.track_id)
-        h, w = ctx.display.shape[:2]
+        h, w = ctx.surface.shape[:2]
         mh, mw = mm.shape[:2]
         _blit(ctx, mm, x0=w - mw - 20, y0=h - mh - 20)
 
@@ -199,7 +199,7 @@ class NetMinimapDrawer:
                 cv2.line(mm, pts_mm[i - 1], pts_mm[i], _TRACK_COLOR, 1, cv2.LINE_AA)
             if pts_mm:
                 cv2.circle(mm, pts_mm[-1], 3, _BALL_COLOR, -1)
-        _blit(ctx, mm, x0=ctx.display.shape[1] - mm.shape[1] - 20, y0=20)
+        _blit(ctx, mm, x0=ctx.surface.shape[1] - mm.shape[1] - 20, y0=20)
 
 
 class HudDrawer:
@@ -217,6 +217,6 @@ class HudDrawer:
         ]
         y = 25
         for line in lines:
-            cv2.putText(ctx.display, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(ctx.surface, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (255, 255, 255), 1, cv2.LINE_AA)
             y += 24

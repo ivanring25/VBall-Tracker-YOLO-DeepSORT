@@ -22,6 +22,11 @@ people:
   model_path: ../models/people_detector.pt
   confidence_threshold: 0.2
   min_players_to_init_teams: 12
+  # Team assignment tuning (KMeans on jersey colour).
+  # Raise if liberos get merged into the main teams, lower if regular
+  # players are misread as liberos. Drop n_init to 3-5 to speed up init.
+  team_color_threshold: 100.0
+  team_kmeans_n_init: 10
 
 tracker:
   max_age: 15
@@ -29,5 +34,17 @@ tracker:
   max_cosine_distance: 0.4
   nn_budget: 10
   history_length: 10
+
+# Bridge short ball-detection gaps with Kalman prediction so the track
+# survives a few missed frames instead of vanishing.
+interpolation:
+  enabled: true
+  max_gap: 5            # frames to coast before declaring the ball lost
+  process_var: 1.0
+  measurement_var: 4.0
+  gravity: 0.0          # px/frame^2 on vy; >0 approximates ballistic fall
+
+# Optional structured per-frame log (JSON Lines). Omit to skip.
+json_output_path: ../data_output/detections.jsonl
 
 field_points_path: ../data/field_config.json

@@ -14,8 +14,14 @@ from vtracker.domain.interfaces import (
     PeopleDetector,
 )
 from vtracker.pipeline.context import FrameContext
+from vtracker.pipeline.stages.interpolate import InterpolateStage
 
 _log = get_logger("vtracker.stages")
+
+__all__ = [
+    "DetectBallStage", "InterpolateStage", "TrackBallStage", "TrackPeopleStage",
+    "VisualizeStage", "ExportStage", "ExportContextStage",
+]
 
 
 class DetectBallStage:
@@ -75,4 +81,16 @@ class ExportStage:
 
     def __call__(self, ctx: FrameContext) -> FrameContext:
         self._exporter.write(ctx.display if ctx.display is not None else ctx.frame)
+        return ctx
+
+
+class ExportContextStage:
+    """Export sinks that record structured results rather than pixels
+    (e.g. ``JsonDetectionExporter``)."""
+
+    def __init__(self, exporter) -> None:
+        self._exporter = exporter
+
+    def __call__(self, ctx: FrameContext) -> FrameContext:
+        self._exporter.write_context(ctx)
         return ctx

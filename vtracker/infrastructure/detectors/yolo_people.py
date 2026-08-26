@@ -23,7 +23,8 @@ class YoloPeopleTracker:
         self._tracker = sv.ByteTrack()
         self._conf = cfg.confidence_threshold
         self._min_init = cfg.min_players_to_init_teams
-        self._teams = TeamAssigner()
+        self._teams = TeamAssigner(color_threshold=cfg.team_color_threshold,
+                                   kmeans_n_init=cfg.team_kmeans_n_init)
 
     def process(self, frame: FrameBGR) -> PeopleFrame:
         result = self._model.predict(source=frame, conf=self._conf, verbose=False)[0]

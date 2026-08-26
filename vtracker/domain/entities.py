@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional
 
 from vtracker.core.types import BBox, Point
 
@@ -21,11 +20,16 @@ class BallDetection:
 
     Replaces the old ``(x, y, w, h, conf)`` tuple from
     ``YOLOBallDetector.detect``.
+
+    ``estimated`` marks a detection that was not measured but predicted (by
+    ``InterpolateStage``) to bridge a short detection gap, so downstream
+    consumers can tell real observations from filled-in ones.
     """
 
     box: BBox
     confidence: float
     label: str = "ball"
+    estimated: bool = False
 
     @property
     def center(self) -> Point:
@@ -38,7 +42,7 @@ class Player:
 
     track_id: str
     box: BBox
-    team: Optional[int] = None
+    team: int | None = None
     is_libero: bool = False
 
     @property
@@ -78,5 +82,5 @@ class TrackState:
     active: bool = False
 
     @property
-    def last_position(self) -> Optional[Point]:
+    def last_position(self) -> Point | None:
         return Point(*self.positions[-1]) if self.positions else None

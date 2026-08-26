@@ -25,9 +25,9 @@ class HomographyProjector:
         self._h_net, _ = cv2.findHomography(net_img, REAL_NET_POINTS)
 
     def project(self, point: Point, plane: str = "field") -> Point:
-        h = self._h_field if plane == "field" else self._h_net
         if plane not in ("field", "net"):
-            raise ValueError("plane must be 'field' or 'net'")
+            raise ValueError(f"plane must be 'field' or 'net', got {plane!r}")
+        h = self._h_field if plane == "field" else self._h_net
         src = np.array([[[point.x, point.y]]], dtype=np.float32)
         dst = cv2.perspectiveTransform(src, h)
         x, y = dst[0][0]

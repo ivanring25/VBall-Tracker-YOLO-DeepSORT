@@ -97,7 +97,31 @@ python -m vtracker.tools.field_marker \
 старого `field_point/field_marker.py`, где путь к видео и конфигу были
 захардкожены).
 
+## Разработка
+
+```bash
+pip install -e ".[dev]"     # + ".[full]" для реального запуска (YOLO/DeepSORT)
+
+ruff check vtracker         # линтер
+mypy vtracker               # типы (0 ошибок)
+pytest vtracker/tests       # тесты
+```
+
+CI (`.github/workflows/ci.yml`) гоняет всё три на Python 3.10 и 3.12 — без GPU,
+потому что доменный слой и пайплайн не зависят от тяжёлого стека.
+
+## Общее ядро с аннотатором
+
+`vtracker.tracking` (Kalman + интерполяторы) — единственная реализация на два
+проекта. `vball_annotator` импортирует её же:
+
+```bash
+pip install -e ../VBall-Tracker-YOLO-DeepSORT
+```
+
+Раньше `KalmanFilter2D` существовал в двух байт-идентичных копиях.
+
 ## Возможные следующие шаги
 
-- Интерполяция мяча при пропуске детекций (переиспользовать `vball_annotator`).
-- Экспорт детекций в JSON (`FrameExporter` → `JsonExporter`).
+- Прогон на реальном видео (нужны веса детектора людей и входной клип).
+- Общий пакет и для сущностей (`Detection` ↔ `BallDetection`).

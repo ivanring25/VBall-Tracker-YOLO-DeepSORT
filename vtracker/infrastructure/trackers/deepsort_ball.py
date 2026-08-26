@@ -16,7 +16,7 @@ import numpy as np
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
 from vtracker.core.config import TrackerConfig
-from vtracker.core.types import FrameBGR, Point
+from vtracker.core.types import FrameBGR
 from vtracker.domain.entities import BallDetection, TrackState
 
 
@@ -49,8 +49,8 @@ class DeepSortBallTracker:
                 continue
             tid = str(track.track_id)
             current.add(tid)
-            l, t, r, b = track.to_ltrb()
-            cx, cy = (l + r) / 2, (t + b) / 2
+            left, top, right, bottom = track.to_ltrb()
+            cx, cy = (left + right) / 2, (top + bottom) / 2
             state = self._history[tid]
             if state.positions:
                 px, py = state.positions[-1]
