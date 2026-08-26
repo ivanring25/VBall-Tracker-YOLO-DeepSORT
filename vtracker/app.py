@@ -35,6 +35,7 @@ from vtracker.visualization.drawers import (
     BallTrackDrawer,
     HudDrawer,
     MinimapDrawer,
+    NetMinimapDrawer,
     PeopleDrawer,
 )
 from vtracker.visualization.renderer import Renderer
@@ -54,7 +55,9 @@ def build_and_run(config_path: str) -> None:
 
     drawers = [BallTrackDrawer(), PeopleDrawer()]
     if cfg.show_minimap and cfg.field_points:
-        drawers.append(MinimapDrawer(HomographyProjector(cfg.field_points)))
+        projector = HomographyProjector(cfg.field_points)
+        drawers.append(MinimapDrawer(projector))
+        drawers.append(NetMinimapDrawer(projector))
     drawers.append(HudDrawer(device))
     renderer = Renderer(drawers)
 

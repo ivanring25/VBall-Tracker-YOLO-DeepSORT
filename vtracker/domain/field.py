@@ -27,6 +27,9 @@ REAL_NET_POINTS = np.array([
 COURT_WIDTH_M = 9.0
 COURT_LENGTH_M = 18.0
 NET_HEIGHT_M = 2.43
+# Vertical extent shown on the net side-view minimap (net height + headroom
+# for a ball crossing well above the net).
+NET_MINIMAP_HEIGHT_M = 8.43
 
 
 @dataclass

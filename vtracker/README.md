@@ -70,7 +70,8 @@ core/            ── config.py, logging.py, types.py
 - Люди (YOLO + ByteTrack) → `infrastructure/detectors/yolo_people.py`
 - Команды (KMeans + кеш цвета по `track_id`) → `domain/services/team_assigner.py`
 - Гомография (поле + сетка) → `infrastructure/projection/homography.py`
-- Визуализация: трек мяча, эллипсы игроков, **мини-карта поля** (кеш базы),
+- Визуализация: трек мяча, эллипсы игроков, **мини-карта поля** (top-down,
+  кеш базы), **мини-карта сетки** (side-view, только мяч + уровень сетки),
   HUD → `visualization/drawers.py`
 - Геометрия/константы поля → `core/geometry.py`, `domain/field.py`
 
@@ -98,6 +99,5 @@ python -m vtracker.tools.field_marker \
 
 ## Возможные следующие шаги
 
-- Мини-карта сетки (side-view) — по образцу `MinimapDrawer`.
 - Интерполяция мяча при пропуске детекций (переиспользовать `vball_annotator`).
 - Экспорт детекций в JSON (`FrameExporter` → `JsonExporter`).

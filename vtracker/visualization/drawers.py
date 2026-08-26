@@ -9,11 +9,24 @@ import cv2
 import numpy as np
 
 from vtracker.core.types import Point
-from vtracker.domain.field import COURT_LENGTH_M, COURT_WIDTH_M
+from vtracker.domain.field import COURT_LENGTH_M, COURT_WIDTH_M, NET_HEIGHT_M, NET_MINIMAP_HEIGHT_M
 from vtracker.pipeline.context import FrameContext
 
 _TEAM_COLORS = {1: (0, 0, 255), 2: (255, 0, 0), None: (0, 255, 0)}
 _REFEREE_COLOR = (0, 255, 255)
+_BALL_COLOR = (0, 0, 255)
+_TRACK_COLOR = (0, 255, 0)
+
+
+def _blit(ctx: FrameContext, patch: np.ndarray, x0: int, y0: int, alpha: float = 0.5) -> None:
+    """Alpha-blend a minimap patch onto the display frame at (x0, y0)."""
+    h, w = ctx.display.shape[:2]
+    mh, mw = patch.shape[:2]
+    x0 = max(0, min(x0, w - mw))
+    y0 = max(0, min(y0, h - mh))
+    overlay = ctx.display.copy()
+    overlay[y0:y0 + mh, x0:x0 + mw] = patch[:, :, :3]
+    cv2.addWeighted(overlay, alpha, ctx.display, 1 - alpha, 0, dst=ctx.display)
 
 
 class BallDetectionDrawer:
@@ -118,7 +131,9 @@ class MinimapDrawer:
                                    player.track_id)
         for ref in ctx.people.referees.values():
             self._project_and_plot(mm, ref.foot, _REFEREE_COLOR, ref.track_id)
-        self._blit(ctx, mm)
+        h, w = ctx.display.shape[:2]
+        mh, mw = mm.shape[:2]
+        _blit(ctx, mm, x0=w - mw - 20, y0=h - mh - 20)
 
     def _project_and_plot(self, mm, foot: Point, color, tid) -> None:
         try:
@@ -127,14 +142,64 @@ class MinimapDrawer:
             return
         self._plot(mm, real.x, real.y, color, tid)
 
-    @staticmethod
-    def _blit(ctx: FrameContext, mm: np.ndarray) -> None:
-        h, w = ctx.display.shape[:2]
-        mh, mw = mm.shape[:2]
-        x0, y0 = w - mw - 20, h - mh - 20
-        overlay = ctx.display.copy()
-        overlay[y0:y0 + mh, x0:x0 + mw] = mm
-        cv2.addWeighted(overlay, 0.5, ctx.display, 0.5, 0, dst=ctx.display)
+
+class NetMinimapDrawer:
+    """Net side-view minimap: ball trajectory + net height level only.
+
+    Shows the vertical (X, Z) plane through the net — X across the court,
+    Z = height above the floor, capped at the net level with headroom for a
+    ball crossing above it. Only the ball is plotted here (players aren't
+    meaningful in this side-on projection); court minimap (top-down) already
+    shows players. Ported from the old ``draw_minimap_net`` /
+    ``create_net_minimap_sideview``.
+    """
+
+    def __init__(self, projector, width: int = 150, height: int = 175,
+                padding: int = 20) -> None:
+        self._projector = projector
+        self._w = width
+        self._h = height
+        self._pad = padding
+        self._base = self._build_base()
+
+    def _build_base(self) -> np.ndarray:
+        w, h, pad = self._w, self._h, self._pad
+        canvas = np.zeros((h + 2 * pad, w + 2 * pad, 3), dtype=np.uint8)
+        canvas[:] = (30, 30, 30)
+
+        z0_y = pad + h
+        z_net_y = pad + int((1 - NET_HEIGHT_M / NET_MINIMAP_HEIGHT_M) * h)
+        # Frame drawn only up to net height (matches the original behaviour).
+        cv2.rectangle(canvas, (pad, z_net_y), (pad + w, z0_y), (255, 255, 255), 1)
+        # Net level line.
+        cv2.line(canvas, (pad, z_net_y), (pad + w, z_net_y), (200, 200, 0), 1)
+        # 1m gridlines with height labels.
+        for z_m in range(1, int(NET_MINIMAP_HEIGHT_M) + 1):
+            y_px = pad + int((1 - z_m / NET_MINIMAP_HEIGHT_M) * h)
+            cv2.line(canvas, (pad, y_px), (pad + w, y_px), (60, 60, 60), 1)
+            cv2.putText(canvas, f"{z_m}m", (2, y_px + 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (180, 180, 180), 1)
+        return canvas
+
+    def draw(self, ctx: FrameContext) -> None:
+        mm = self._base.copy()
+        for state in ctx.ball_tracks.values():
+            if not state.active or len(state.positions) < 1:
+                continue
+            pts_mm = []
+            for px, py in state.positions:
+                try:
+                    real = self._projector.project(Point(px, py), plane="net")
+                except Exception:
+                    continue
+                mx = self._pad + int((real.x / COURT_WIDTH_M) * self._w)
+                mz = self._pad + int((1 - real.y / NET_MINIMAP_HEIGHT_M) * self._h)
+                pts_mm.append((mx, mz))
+            for i in range(1, len(pts_mm)):
+                cv2.line(mm, pts_mm[i - 1], pts_mm[i], _TRACK_COLOR, 1, cv2.LINE_AA)
+            if pts_mm:
+                cv2.circle(mm, pts_mm[-1], 3, _BALL_COLOR, -1)
+        _blit(ctx, mm, x0=ctx.display.shape[1] - mm.shape[1] - 20, y0=20)
 
 
 class HudDrawer:
