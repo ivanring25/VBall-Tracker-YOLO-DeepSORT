@@ -11,8 +11,18 @@ video:
   skip_frames: 1
   save_output: true
   show_output: true
+  # Frames decoded ahead on a background thread, so decoding overlaps with
+  # detection instead of blocking it. 0 = decode inline (no thread).
+  prefetch_queue: 8
 
 detector:
+  # motion_roi = CPU motion mask + contour filter, then a YOLO *classifier*
+  #              on each candidate ROI (needs classification weights).
+  # direct     = one full-frame YOLO *detection* pass, no CPU pre-processing
+  #              (needs detection weights). Benchmark both on your footage:
+  #              direct is far cheaper on CPU, motion_roi may recall better
+  #              on small fast balls.
+  mode: motion_roi
   model_path: ../models/ball_cv_new_data.pt
   confidence_threshold: 0.96
   min_area: 100
@@ -27,6 +37,10 @@ people:
   # players are misread as liberos. Drop n_init to 3-5 to speed up init.
   team_color_threshold: 100.0
   team_kmeans_n_init: 10
+  # Full-frame people inference every Nth frame; the previous result is reused
+  # in between. Players move slowly, so 2-3 usually costs little accuracy and
+  # cuts the biggest GPU item. 1 = every frame. Boxes lag up to N-1 frames.
+  detect_interval: 1
 
 tracker:
   max_age: 15

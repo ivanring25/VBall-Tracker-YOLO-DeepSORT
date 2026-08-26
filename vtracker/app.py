@@ -16,6 +16,7 @@ import sys
 
 from vtracker.core.config import Config
 from vtracker.core.logging import get_logger
+from vtracker.infrastructure.detectors.direct_ball import DirectYoloBallDetector
 from vtracker.infrastructure.detectors.yolo_ball import YoloBallDetector
 from vtracker.infrastructure.detectors.yolo_people import YoloPeopleTracker
 from vtracker.infrastructure.display import DisplayStage
@@ -24,6 +25,7 @@ from vtracker.infrastructure.exporters.video_exporter import VideoExporter
 from vtracker.infrastructure.projection.homography import HomographyProjector
 from vtracker.infrastructure.trackers.deepsort_ball import DeepSortBallTracker
 from vtracker.infrastructure.video.opencv_source import OpenCvVideoSource
+from vtracker.infrastructure.video.prefetch_source import PrefetchVideoSource
 from vtracker.pipeline.runner import PipelineRunner, Stage
 from vtracker.pipeline.stages import (
     DetectBallStage,
@@ -34,6 +36,7 @@ from vtracker.pipeline.stages import (
     TrackPeopleStage,
     VisualizeStage,
 )
+from vtracker.pipeline.stages.people_interval import IntervalPeopleDetector
 from vtracker.visualization.drawers import (
     BallTrackDrawer,
     HudDrawer,
@@ -50,11 +53,26 @@ def build_and_run(config_path: str) -> None:
     device = cfg.resolve_device()
     log.info("device: %s | video: %s", device, cfg.video.input_path)
 
-    source = OpenCvVideoSource(cfg.video.input_path)
+    source: OpenCvVideoSource | PrefetchVideoSource = OpenCvVideoSource(
+        cfg.video.input_path)
+    if cfg.video.prefetch_queue > 0:
+        # Overlap decoding with detection/inference instead of serialising them.
+        source = PrefetchVideoSource(source, queue_size=cfg.video.prefetch_queue)
 
-    detector = YoloBallDetector(cfg.detector, device)
+    detector: YoloBallDetector | DirectYoloBallDetector
+    if cfg.detector.mode == "direct":
+        detector = DirectYoloBallDetector(cfg.detector, device, cfg.video.frame_size)
+    else:
+        detector = YoloBallDetector(cfg.detector, device)
     tracker = DeepSortBallTracker(cfg.tracker, fps=source.fps)
-    people = YoloPeopleTracker(cfg.people)
+
+    people: YoloPeopleTracker | IntervalPeopleDetector = YoloPeopleTracker(
+        cfg.people, device=device, warmup_size=cfg.video.frame_size)
+    if cfg.people.detect_interval > 1:
+        # Players move slowly relative to the ball: reuse the last result
+        # between refreshes rather than paying a full-frame pass every frame.
+        people = IntervalPeopleDetector(people, cfg.people.detect_interval)
+        log.info("people inference every %d frames", cfg.people.detect_interval)
 
     drawers = [BallTrackDrawer(), PeopleDrawer()]
     if cfg.show_minimap and cfg.field_points:

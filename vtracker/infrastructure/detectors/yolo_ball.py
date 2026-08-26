@@ -17,6 +17,7 @@ from vtracker.core.config import DetectorConfig
 from vtracker.core.logging import get_logger
 from vtracker.core.types import BBox, FrameBGR
 from vtracker.domain.entities import BallDetection
+from vtracker.infrastructure.detectors._runtime import inference_context, use_half, warmup
 
 _log = get_logger("vtracker.detector")
 _LOWER_HSV = np.array([10, 50, 115])
@@ -33,7 +34,9 @@ class YoloBallDetector:
         self._fgbg = cv2.createBackgroundSubtractorMOG2(
             history=5, varThreshold=70, detectShadows=False)
         self._prev_gray: np.ndarray | None = None
-        _log.info("ball detector ready on %s", device)
+        self._half = use_half(device)
+        warmup(self._model, device, (64, 64))
+        _log.info("ball detector ready on %s (fp16=%s)", device, self._half)
 
     # --- motion preprocessing ---------------------------------------------
     def _motion_mask(self, frame: FrameBGR) -> np.ndarray:
@@ -94,7 +97,9 @@ class YoloBallDetector:
             kept.append((x, y, w, h))
         if not rois:
             return []
-        results = self._model(rois, device=self._device, verbose=False)
+        with inference_context():
+            results = self._model(rois, device=self._device, verbose=False,
+                                  half=self._half)
         out: list[BallDetection] = []
         for (x, y, w, h), r in zip(kept, results, strict=True):
             if r.probs is None:

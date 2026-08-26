@@ -29,6 +29,11 @@ class DetectorConfig:
     confidence_threshold: float = 0.9
     min_area: int = 100
     max_area: int = 10000
+    # "motion_roi": CPU motion mask + contour filter, then a YOLO *classifier*
+    #   on each candidate ROI (the original approach).
+    # "direct": one full-frame YOLO *detection* pass, no CPU pre-processing.
+    # They need different weights; see infrastructure/detectors/direct_ball.py.
+    mode: str = "motion_roi"
 
 
 @dataclass
@@ -41,6 +46,10 @@ class PeopleConfig:
     # ordinary players are misread as liberos.
     team_color_threshold: float = 100.0
     team_kmeans_n_init: int = 10
+    # Run the (expensive) full-frame people inference every Nth frame and
+    # reuse the previous result in between. 1 = every frame. Higher values
+    # cut GPU time but leave player boxes up to N-1 frames stale.
+    detect_interval: int = 1
 
 
 @dataclass
@@ -71,6 +80,10 @@ class VideoConfig:
     skip_frames: int = 1
     save_output: bool = True
     show_output: bool = True
+    # Frames decoded ahead on a background thread. 0 disables the prefetch
+    # thread (decode inline). Bounded so a slow consumer can't buffer the
+    # whole clip into memory.
+    prefetch_queue: int = 8
 
 
 @dataclass
@@ -110,6 +123,8 @@ class Config:
             errors.append(f"video.frame_size must be positive, got {(w, h)}")
         if self.video.skip_frames < 1:
             errors.append("video.skip_frames must be >= 1")
+        if self.video.prefetch_queue < 0:
+            errors.append("video.prefetch_queue must be >= 0")
 
         if not 0.0 <= self.detector.confidence_threshold <= 1.0:
             errors.append("detector.confidence_threshold must be in [0, 1]")
@@ -117,8 +132,14 @@ class Config:
             errors.append("people.confidence_threshold must be in [0, 1]")
         if self.detector.min_area >= self.detector.max_area:
             errors.append("detector.min_area must be < detector.max_area")
+        if self.detector.mode not in ("motion_roi", "direct"):
+            errors.append(
+                f"detector.mode must be 'motion_roi' or 'direct', "
+                f"got {self.detector.mode!r}")
         if self.interpolation.max_gap < 1:
             errors.append("interpolation.max_gap must be >= 1")
+        if self.people.detect_interval < 1:
+            errors.append("people.detect_interval must be >= 1")
 
         if self.device not in ("auto", "cpu", "cuda") and not self.device.startswith("cuda:"):
             errors.append(f"device must be auto|cpu|cuda[:N], got {self.device!r}")
@@ -214,17 +235,20 @@ class Config:
                 output_path=rel_required(v.get("output_path", "output.mp4"), "video.output_path"),
                 frame_size=tuple(v.get("frame_size", (1280, 720))),
                 skip_frames=v.get("skip_frames", 1),
+                prefetch_queue=v.get("prefetch_queue", 8),
                 save_output=v.get("save_output", True),
                 show_output=v.get("show_output", True),
             ),
             detector=DetectorConfig(model_path=rel_required(d.get("model_path"), "detector.model_path"),
                                     **{k: d[k] for k in
-                                       ("confidence_threshold", "min_area", "max_area")
+                                       ("confidence_threshold", "min_area", "max_area",
+                                        "mode")
                                        if k in d}),
             people=PeopleConfig(model_path=rel_required(ppl.get("model_path"), "people.model_path"),
                                 **{k: ppl[k] for k in
                                    ("confidence_threshold", "min_players_to_init_teams",
-                                    "team_color_threshold", "team_kmeans_n_init")
+                                    "team_color_threshold", "team_kmeans_n_init",
+                                    "detect_interval")
                                    if k in ppl}),
             tracker=TrackerConfig(**trk),
             interpolation=InterpolationConfig(**interp),

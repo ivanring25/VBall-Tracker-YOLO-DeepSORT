@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from vtracker.core.types import BBox
-from vtracker.domain.entities import BallDetection, PeopleFrame, Player
+from vtracker.domain.entities import BallDetection, PeopleFrame, Player, TrackState
 from vtracker.pipeline.context import FrameContext
 from vtracker.pipeline.runner import PipelineRunner
 from vtracker.pipeline.stages import (
@@ -41,12 +41,25 @@ class FakeDetector:
 
 
 class FakeTracker:
+    """Honours the full BallTracker contract (update + tracks + speed)."""
+
     def __init__(self):
         self.calls = 0
+        state = TrackState()
+        state.active = True
+        state.positions.append((1.0, 2.0))
+        self._tracks = {"1": state}
 
     def update(self, detections, frame):
         self.calls += 1
         assert all(isinstance(d, BallDetection) for d in detections)
+
+    @property
+    def tracks(self):
+        return self._tracks
+
+    def speed(self, track_id):
+        return 42.0
 
 
 class FakePeople:

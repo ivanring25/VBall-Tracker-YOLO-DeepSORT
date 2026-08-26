@@ -19,14 +19,23 @@ _TRACK_COLOR = (0, 255, 0)
 
 
 def _blit(ctx: FrameContext, patch: np.ndarray, x0: int, y0: int, alpha: float = 0.5) -> None:
-    """Alpha-blend a minimap patch onto the display frame at (x0, y0)."""
-    h, w = ctx.surface.shape[:2]
+    """Alpha-blend a minimap patch onto the display frame at (x0, y0).
+
+    Only the destination rectangle is touched. The previous version copied the
+    whole frame and ran addWeighted over all of it to composite a ~150x175
+    patch — outside the patch that blended the frame with itself
+    (0.5*x + 0.5*x == x), so ~96% of the pixel work was discarded. Blending the
+    ROI in place is byte-identical and roughly 25x less work per minimap.
+    """
+    surface = ctx.surface
+    h, w = surface.shape[:2]
     mh, mw = patch.shape[:2]
+    if mh > h or mw > w:
+        return
     x0 = max(0, min(x0, w - mw))
     y0 = max(0, min(y0, h - mh))
-    overlay = ctx.surface.copy()
-    overlay[y0:y0 + mh, x0:x0 + mw] = patch[:, :, :3]
-    cv2.addWeighted(overlay, alpha, ctx.surface, 1 - alpha, 0, dst=ctx.surface)
+    roi = surface[y0:y0 + mh, x0:x0 + mw]
+    cv2.addWeighted(patch[:, :, :3], alpha, roi, 1 - alpha, 0, dst=roi)
 
 
 class BallDetectionDrawer:

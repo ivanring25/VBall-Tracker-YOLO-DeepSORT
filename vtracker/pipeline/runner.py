@@ -33,27 +33,34 @@ class PipelineRunner:
         self.processed = 0
 
     def run(self) -> None:
-        start = time.time()
+        start = time.perf_counter()
+        # Throughput of the previous frame. Stages (HUD, JSON export) read
+        # ctx.fps, so it must be known *before* they run — it used to be
+        # assigned after the stage loop, which meant every consumer saw 0.0.
+        last_fps = 0.0
         try:
             for index, raw in enumerate(self._source.frames()):
                 if index % self._skip != 0:
                     continue
-                t0 = time.time()
+                t0 = time.perf_counter()
                 frame: FrameBGR = cv2.resize(raw, self._frame_size)
-                ctx = FrameContext(index=index, frame=frame, display=frame.copy())
+                # No eager copy: FrameContext.surface allocates the overlay
+                # buffer only if something actually draws on it, so headless
+                # runs don't pay a full-frame memcpy per frame.
+                ctx = FrameContext(index=index, frame=frame, fps=last_fps)
                 for stage in self._stages:
                     ctx = stage(ctx)
                 self.processed += 1
-                dt = time.time() - t0
-                ctx.fps = (1.0 / dt) if dt > 0 else 0.0
+                dt = time.perf_counter() - t0
+                last_fps = (1.0 / dt) if dt > 0 else 0.0
                 if self.processed % 50 == 0:
                     self._log.info("processed %d frames (%.1f fps)",
-                                   self.processed, ctx.fps)
+                                   self.processed, last_fps)
         except KeyboardInterrupt:
             self._log.info("interrupted by user")
         finally:
             self._source.release()
-            total = time.time() - start
+            total = time.perf_counter() - start
             avg = self.processed / total if total else 0.0
             self._log.info("done: %d frames in %.1fs (avg %.1f fps)",
                            self.processed, total, avg)

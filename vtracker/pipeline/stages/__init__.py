@@ -43,12 +43,12 @@ class TrackBallStage:
 
     def __call__(self, ctx: FrameContext) -> FrameContext:
         self._tracker.update(ctx.detections, ctx.frame)
-        # Surface track state for the drawers (active tracks only).
-        tracks = getattr(self._tracker, "tracks", {})
+        tracks = self._tracker.tracks
         ctx.ball_tracks = tracks
-        speed = getattr(self._tracker, "speed", None)
-        if callable(speed):
-            ctx.ball_speeds = {tid: speed(tid) for tid in tracks}
+        # Only active tracks are drawn or exported, so don't run the median
+        # over the speed history of tracks nobody will look at.
+        ctx.ball_speeds = {tid: self._tracker.speed(tid)
+                           for tid, state in tracks.items() if state.active}
         return ctx
 
 

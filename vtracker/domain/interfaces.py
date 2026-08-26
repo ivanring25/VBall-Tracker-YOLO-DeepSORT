@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from vtracker.core.types import FrameBGR, Point
-from vtracker.domain.entities import BallDetection, PeopleFrame
+from vtracker.domain.entities import BallDetection, PeopleFrame, TrackState
 
 
 @runtime_checkable
@@ -40,6 +40,14 @@ class BallDetector(Protocol):
 @runtime_checkable
 class BallTracker(Protocol):
     def update(self, detections: list[BallDetection], frame: FrameBGR) -> None: ...
+
+    @property
+    def tracks(self) -> dict[str, TrackState]:
+        """Track id -> history. Part of the contract: the pipeline used to dig
+        these out with ``getattr`` fallbacks, which hid the dependency."""
+        ...
+
+    def speed(self, track_id: str) -> float: ...
 
 
 @runtime_checkable

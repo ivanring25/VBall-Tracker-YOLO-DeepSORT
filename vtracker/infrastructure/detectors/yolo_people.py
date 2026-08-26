@@ -13,23 +13,35 @@ from vtracker.core.logging import get_logger
 from vtracker.core.types import BBox, FrameBGR
 from vtracker.domain.entities import PeopleFrame, Player, Referee
 from vtracker.domain.services.team_assigner import TeamAssigner
+from vtracker.infrastructure.detectors._runtime import inference_context, use_half, warmup
 
 _log = get_logger("vtracker.people")
 
 
 class YoloPeopleTracker:
-    def __init__(self, cfg: PeopleConfig) -> None:
+    def __init__(self, cfg: PeopleConfig, device: str = "cpu",
+                 warmup_size: tuple[int, int] = (640, 640)) -> None:
         self._model = YOLO(cfg.model_path)
         self._tracker = sv.ByteTrack()
         self._conf = cfg.confidence_threshold
         self._min_init = cfg.min_players_to_init_teams
         self._teams = TeamAssigner(color_threshold=cfg.team_color_threshold,
                                    kmeans_n_init=cfg.team_kmeans_n_init)
+        # Class-name -> id map is fixed for the loaded weights; it used to be
+        # rebuilt from result.names on every frame.
+        names = getattr(self._model, "names", {}) or {}
+        self._player_cls = next((k for k, v in names.items() if v == "Players"), None)
+        self._referee_cls = next((k for k, v in names.items() if v == "Referee"), None)
+        self._device = device
+        self._half = use_half(device)
+        warmup(self._model, device, warmup_size)
 
     def process(self, frame: FrameBGR) -> PeopleFrame:
-        result = self._model.predict(source=frame, conf=self._conf, verbose=False)[0]
+        with inference_context():
+            result = self._model.predict(source=frame, conf=self._conf,
+                                         device=self._device, half=self._half,
+                                         verbose=False)[0]
         detections = sv.Detections.from_ultralytics(result)
-        names_inv = {v: k for k, v in result.names.items()}
         tracked = self._tracker.update_with_detections(detections)
 
         player_boxes: dict[str, BBox] = {}
@@ -38,9 +50,9 @@ class YoloPeopleTracker:
             bbox, _, _, cls_id, track_id, _ = det
             tid = str(track_id)
             box = BBox.from_ltrb(*bbox.tolist())
-            if cls_id == names_inv.get("Players"):
+            if cls_id == self._player_cls:
                 player_boxes[tid] = box
-            elif cls_id == names_inv.get("Referee"):
+            elif cls_id == self._referee_cls:
                 referee_boxes[tid] = box
 
         if not self._teams.initialized and len(player_boxes) >= self._min_init:
