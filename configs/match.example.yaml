@@ -30,6 +30,4 @@ tracker:
   nn_budget: 10
   history_length: 10
 
-# Either inline the field points or point to a JSON file (resolved relative
-# to this config). The JSON format matches data/field_config.json.
 field_points_path: ../data/field_config.json

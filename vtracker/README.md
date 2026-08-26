@@ -74,6 +74,28 @@ core/            ── config.py, logging.py, types.py
   HUD → `visualization/drawers.py`
 - Геометрия/константы поля → `core/geometry.py`, `domain/field.py`
 
+- Разметка точек поля (court/net) для `field_points_path` → `vtracker/tools/field_marker.py`
+
+## Инструменты
+
+### Разметка точек поля
+
+Перед первым запуском на новом видео нужен JSON с точками поля/сетки
+(`field_points_path` в конфиге). Разметить их можно интерактивно:
+
+```bash
+python -m vtracker.tools.field_marker \
+    --video path/to/match.mp4 --frame 195 \
+    --width 1280 --height 720 \
+    --out data/field_config.json
+```
+
+Управление: `1`/`2`/`3` — категория (court/net/other), клик — добавить точку,
+`z` — отменить последнюю, `c` — очистить категорию, `s`/`l` — сохранить/загрузить,
+`q` — выход. Путей в исходнике нет — всё через аргументы CLI (в отличие от
+старого `field_point/field_marker.py`, где путь к видео и конфигу были
+захардкожены).
+
 ## Возможные следующие шаги
 
 - Мини-карта сетки (side-view) — по образцу `MinimapDrawer`.
